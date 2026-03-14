@@ -1,0 +1,17 @@
+{
+  "name": "deploy-manager",
+  "version": "1.0.0",
+  "description": "Telegram Deploy Manager Bot — автодеплой через GitHub webhook с live-стримингом логов",
+  "author": "gusev-hub",
+  "license": "MIT",
+  "bin": {
+    "deploy-manager": "./bin/init.js"
+  },
+  "scripts": {
+    "start": "node scripts/tg-bot.js",
+    "webhook": "node scripts/webhook/index.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
