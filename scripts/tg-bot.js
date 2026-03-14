@@ -35,26 +35,37 @@ const WEBHOOK_QUEUE_FILE = path.join(LOGS_DIR, "webhook-queue.json");
 const CONTEXT_FILE = path.join(LOGS_DIR, "deploy-context.txt");
 const QUEUE_MAX_HISTORY = 10; // сколько завершённых деплоев хранить
 
+// ─── Сервисы проекта (настраиваются через DEPLOY_SERVICES) ──────────────────
+// Формат: "web bot worker" (через пробел)
+const SERVICES_LIST = (process.env.DEPLOY_SERVICES || "web bot worker").split(/\s+/).filter(Boolean);
+
+// Строит объект services: { web: "web", bot: "bot" } или { web: "dev-web", ... }
+function buildServicesMap(prefix = "") {
+  const map = {};
+  for (const svc of SERVICES_LIST) map[svc] = `${prefix}${svc}`;
+  return map;
+}
+
 // ─── Конфигурация контекста (prod / dev) ────────────────────────────────────
 function getContextConfig(ctx) {
   if (ctx === "dev") return {
-    composeFile: "docker-compose.dev.yml",
+    composeFile: process.env.DEV_COMPOSE_FILE || "docker-compose.dev.yml",
     workDir: process.env.DEV_WORK_DIR || `${PROJECT_DIR}-dev`,
     branch: "develop",
-    services: { web: "dev-web", bot: "dev-bot", worker: "dev-worker" },
+    services: buildServicesMap("dev-"),
     label: "DEV",
     logFile: "deploy-dev.log",
-    projectName: "nbp-dev",
+    projectName: `${PROJECT_NAME}-dev`,
     servicePrefix: "dev-",
   };
   return {
-    composeFile: "docker-compose.yml",
+    composeFile: process.env.PROD_COMPOSE_FILE || "docker-compose.yml",
     workDir: PROJECT_DIR,
     branch: "main",
-    services: { web: "web", bot: "bot", worker: "worker" },
+    services: buildServicesMap(),
     label: "PROD",
     logFile: "deploy-prod.log",
-    projectName: "nbp",
+    projectName: PROJECT_NAME,
     servicePrefix: "",
   };
 }

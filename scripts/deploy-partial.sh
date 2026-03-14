@@ -102,14 +102,8 @@ if [[ "${DEPLOY_SOURCE:-}" == "bot" ]]; then
 fi
 
 # ─── Конфигурация target ──────────────────────────────────────────────────────
-case "$TARGET" in
-  web) LABEL="Web" ;;
-  bot) LABEL="Bot" ;;
-  *)
-    log "Неизвестный target: ${TARGET}. Доступные: web, bot"
-    exit 1
-    ;;
-esac
+# Любой Docker Compose сервис принимается как target
+LABEL="$(echo "${TARGET}" | sed 's/.*/\u&/')"
 
 # Docker-сервис с учётом префикса (dev-web, dev-bot или web, bot)
 DOCKER_TARGET="${SERVICE_PREFIX}${TARGET}"
