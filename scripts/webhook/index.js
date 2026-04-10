@@ -22,7 +22,11 @@ const path = require("path");
 const fs = require("fs");
 
 // ─── Конфигурация ─────────────────────────────────────────────────────────────
-const SECRET = process.env.DEPLOY_SECRET || "nbp_deploy_2026_secret";
+const SECRET = process.env.DEPLOY_SECRET;
+if (!SECRET) {
+  console.error("[FATAL] DEPLOY_SECRET environment variable is required");
+  process.exit(1);
+}
 const PORT = parseInt(process.env.WEBHOOK_PORT || "3010", 10);
 const PROJECT_DIR =
   process.env.PROJECT_DIR || path.resolve(__dirname, "..", "..");

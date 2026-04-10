@@ -53,7 +53,7 @@ function getContextConfig(ctx) {
     workDir: process.env.DEV_WORK_DIR || `${PROJECT_DIR}-dev`,
     branch: "develop",
     services: buildServicesMap("dev-"),
-    label: "DEV",
+    label: "🟡 DEV",
     logFile: "deploy-dev.log",
     projectName: `${PROJECT_NAME}-dev`,
     servicePrefix: "dev-",
@@ -63,7 +63,7 @@ function getContextConfig(ctx) {
     workDir: PROJECT_DIR,
     branch: "main",
     services: buildServicesMap(),
-    label: "PROD",
+    label: "🟢 PROD",
     logFile: "deploy-prod.log",
     projectName: PROJECT_NAME,
     servicePrefix: "",
@@ -188,7 +188,7 @@ function log(msg) {
 }
 
 // ─── Telegram API ─────────────────────────────────────────────────────────────
-function tgRequest(method, body) {
+function tgRequest(method, body, timeoutMs = 10000) {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(body);
     const req = https.request(
@@ -200,6 +200,7 @@ function tgRequest(method, body) {
           "Content-Type": "application/json",
           "Content-Length": Buffer.byteLength(data),
         },
+        timeout: timeoutMs,
       },
       (res) => {
         let raw = "";
@@ -210,6 +211,7 @@ function tgRequest(method, body) {
         });
       }
     );
+    req.on("timeout", () => { req.destroy(new Error(`tgRequest ${method} timed out after ${timeoutMs}ms`)); });
     req.on("error", reject);
     req.write(data);
     req.end();
@@ -404,7 +406,7 @@ async function enqueueDeployFor(chatId, script, label, noCache = false, ctxConfi
 
   const res = await sendMessage(chatId, buildJobHeader(job), {
     reply_markup: deployJobKeyboard(id),
-  });
+  }).catch(() => null);
   job.msgId = res?.result?.message_id ?? null;
 
   log(`[INFO] Queued: "${label}" (id=${id}, queue=${deployQueue.filter(j => j.status === "queued").length})`);
@@ -569,7 +571,7 @@ function runNextJob() {
         // runNextJob() уже вызвана внутри enqueueDeployFor()
       } else if (!failed) {
         // Перезапускаем только при успешном деплое — подхватываем новый код менеджера
-        exec("pm2 restart ${DM_PROCESS_NAME} --update-env --force", (e) => {
+        exec(`pm2 restart ${DM_PROCESS_NAME} --update-env --force`, (e) => {
           if (e) log(`[WARN] Self-restart failed: ${e.message}`);
         });
       } else {
@@ -678,7 +680,7 @@ async function getPm2Status() {
 function mainKeyboard() {
   const config = getContextConfig(currentContext);
   const ci = currentContext === "prod" ? "🟢" : "🟡"; // context icon
-  const ctxTarget = currentContext === "prod" ? "DEV" : "PROD";
+  const ctxTarget = currentContext === "prod" ? "🟡 DEV" : "🟢 PROD";
   // PROD = success (зелёные 🟢), DEV = primary (синие 🟡)
   const actionStyle = currentContext === "prod" ? "success" : "primary";
   const contextBtn = { text: `${ci} ${config.label} — переключить на ${ctxTarget}`, callback_data: "switch_context", style: "primary" };
@@ -1019,7 +1021,7 @@ async function handleCallback(query) {
     // Используем restart вместо reload (fork-режим не поддерживает graceful reload)
     // и --force чтобы не получать "Reload already in progress".
     setTimeout(() => {
-      exec("pm2 restart ${DM_PROCESS_NAME} --update-env --no-color --force", (e) => {
+      exec(`pm2 restart ${DM_PROCESS_NAME} --update-env --no-color --force`, (e) => {
         if (e) log(`[WARN] Manager restart failed: ${e.message}`);
       });
     }, 300);
@@ -1184,7 +1186,7 @@ async function poll() {
       offset,
       timeout: 30,
       allowed_updates: ["message", "callback_query"],
-    });
+    }, 40000); // 40s HTTP timeout для long-polling (Telegram timeout=30s + запас)
 
     if (!res.ok || !Array.isArray(res.result)) {
       await new Promise((r) => setTimeout(r, 3000));
